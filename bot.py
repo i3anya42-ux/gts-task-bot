@@ -347,7 +347,6 @@ async def setup_webhook():
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
-        # Используем существующий loop или создаём новый
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
