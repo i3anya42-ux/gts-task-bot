@@ -341,7 +341,6 @@ async def handle_voice(message: Message):
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
-        # Создаём новый event loop для каждого запроса
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(dp.feed_update(bot, update))
@@ -351,13 +350,6 @@ def webhook():
         logger.error(f"Webhook error: {e}")
         return 'error', 500
 
-async def setup_webhook():
-    if WEBHOOK_URL:
-        webhook_path = WEBHOOK_URL + '/' + BOT_TOKEN
-        await bot.set_webhook(webhook_path)
-        logger.info(f"Webhook установлен: {webhook_path}")
-
 if __name__ == '__main__':
-    asyncio.run(setup_webhook())
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
