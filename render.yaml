@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: gts-task-bot
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python bot.py"
+    envVars:
+      - key: BOT_TOKEN
+        value: 8656704437:AAEZxBboXqIGWUPbdLPc8t9a2jo4tqTVSdE
+      - key: SPREADSHEET_NAME
+        value: GTS Tasks Manager
+      - key: PYTHON_VERSION
+        value: 3.11.0
