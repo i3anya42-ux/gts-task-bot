@@ -14,29 +14,17 @@ import io
 import tempfile
 import requests
 
-# === НАСТРОЙКИ ===
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8656704437:AAEZxBboXqIGWUPbdLPc8t9a2jo4tqTVSdE")
 OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID")
 WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
-
-# Google Sheets
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 SPREADSHEET_NAME = os.environ.get("SPREADSHEET_NAME", "GTS Tasks Manager")
-
-# Flask app
 app = Flask(__name__)
-
-# Bot & Dispatcher
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Мотивационные фразы
 MOTIVATIONS = [
     "🔥 Сегодня ты продуктивнее, чем вчера!",
     "⚡ Каждая галочка — шаг к цели!",
@@ -50,12 +38,9 @@ MOTIVATIONS = [
     "⚡ Действуй сейчас — идеальный момент уже наступил!",
 ]
 
-URGENT_KEYWORDS = ['срочно', 'сегодня', 'завтра', 'немедленно', 'важно', 'критично', 
-                   'военкомат', 'суд', 'иск', 'оплата', 'отгрузка сегодня', 'срочная']
-IMPORTANT_KEYWORDS = ['клиент', 'заявка', 'счёт', 'счет', 'отгрузка', 'поставщик', 'водоканал', 
-                      'станкор', 'промторг', 'спасск', 'астафьев']
+URGENT_KEYWORDS = ['срочно', 'сегодня', 'завтра', 'немедленно', 'важно', 'критично', 'военкомат', 'суд', 'иск', 'оплата', 'отгрузка сегодня', 'срочная']
+IMPORTANT_KEYWORDS = ['клиент', 'заявка', 'счёт', 'счет', 'отгрузка', 'поставщик', 'водоканал', 'станкор', 'промторг', 'спасск', 'астафьев']
 
-# === GOOGLE SHEETS ===
 def get_gsheet_client():
     try:
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
@@ -84,8 +69,7 @@ def get_or_create_sheet():
     except gspread.SpreadsheetNotFound:
         spreadsheet = client.create(SPREADSHEET_NAME)
         sheet = spreadsheet.sheet1
-        sheet.append_row(['ID', 'Дата создания', 'Задача', 'Приоритет', 'Статус', 
-                          'Теги', 'Дедлайн', 'Дата выполнения', 'Chat ID'])
+        sheet.append_row(['ID', 'Дата создания', 'Задача', 'Приоритет', 'Статус', 'Теги', 'Дедлайн', 'Дата выполнения', 'Chat ID'])
         spreadsheet.share('', perm_type='anyone', role='reader')
         logger.info(f"Таблица '{SPREADSHEET_NAME}' создана")
     return sheet
@@ -94,10 +78,8 @@ def add_task_to_sheet(task_text, chat_id, priority='normal', tags='', deadline='
     sheet = get_or_create_sheet()
     if not sheet:
         return False, "Ошибка подключения к Google Sheets"
-
     task_id = str(int(datetime.now().timestamp()))
     date_str = datetime.now().strftime('%d.%m.%Y %H:%M')
-
     try:
         sheet.append_row([task_id, date_str, task_text, priority, 'Активна', tags, deadline, '', str(chat_id)])
         logger.info(f"Задача добавлена: {task_text}")
@@ -131,7 +113,6 @@ def mark_task_done(task_index, chat_id=None):
             if r.get('Статус') == 'Активна':
                 if chat_id is None or str(r.get('Chat ID', '')) == str(chat_id):
                     active_indices.append(i + 2)
-
         if 0 <= task_index < len(active_indices):
             row_num = active_indices[task_index]
             task_text = records[row_num - 2].get('Задача', '')
@@ -153,7 +134,6 @@ def delete_task(task_index, chat_id=None):
             if r.get('Статус') == 'Активна':
                 if chat_id is None or str(r.get('Chat ID', '')) == str(chat_id):
                     active_indices.append(i + 2)
-
         if 0 <= task_index < len(active_indices):
             row_num = active_indices[task_index]
             task_text = records[row_num - 2].get('Задача', '')
@@ -191,11 +171,9 @@ def get_tags(text):
 def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
     if not tasks:
         return "📭 Список задач пуст. Добавь первую: просто напиши текст!"
-    
     lines = []
     lines.append("<b>" + title + ":</b>")
     lines.append("")
-    
     for i, task in enumerate(tasks, 1):
         priority = task.get('Приоритет', 'normal')
         emoji = '🔥' if priority == 'urgent' else '⚡' if priority == 'important' else '📅'
@@ -207,13 +185,10 @@ def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
         lines.append(emoji + ' <b>#' + str(i) + '</b> ' + task_text)
         lines.append('   ' + tags + ' | ' + date)
         lines.append("")
-    
     lines.append("")
     lines.append("<i>Всего активных: " + str(len(tasks)) + "</i>")
-    
     return "\n".join(lines)
 
-# === KEYBOARD ===
 main_kb = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📋 Мои задачи")],
@@ -223,24 +198,24 @@ main_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-# === HANDLERS ===
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    welcome = """👋 <b>Привет!</b> Я твой личный помощник по задачам.
-
-<b>Как пользоваться:</b>
-• Просто напиши задачу — я добавлю в список
-• Используй кнопки или команды
-
-<b>Команды:</b>
-/add [текст] — добавить задачу
-/list — все задачи
-/done [номер] — отметить выполненной
-/priority — топ-5 срочных
-/delete [номер] — удалить
-
-""" + MOTIVATIONS[0]
-    await message.answer(welcome, reply_markup=main_kb, parse_mode='HTML')
+    lines = []
+    lines.append("👋 <b>Привет!</b> Я твой личный помощник по задачам.")
+    lines.append("")
+    lines.append("<b>Как пользоваться:</b>")
+    lines.append("• Просто напиши задачу — я добавлю в список")
+    lines.append("• Используй кнопки или команды")
+    lines.append("")
+    lines.append("<b>Команды:</b>")
+    lines.append("/add [текст] — добавить задачу")
+    lines.append("/list — все задачи")
+    lines.append("/done [номер] — отметить выполненной")
+    lines.append("/priority — топ-5 срочных")
+    lines.append("/delete [номер] — удалить")
+    lines.append("")
+    lines.append(MOTIVATIONS[0])
+    await message.answer("\n".join(lines), reply_markup=main_kb, parse_mode='HTML')
 
 @dp.message(Command("add"))
 async def cmd_add(message: Message):
@@ -262,15 +237,14 @@ async def cmd_done(message: Message):
         success, result = mark_task_done(num, chat_id=message.chat.id)
         if success:
             remaining = len(get_all_tasks(chat_id=message.chat.id))
-            msg = '✅ <b>Готово!</b>
-
-Задача выполнена: ' + result + '
-
-'
-            msg += 'Осталось задач: ' + str(remaining) + '
-'
-            msg += MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)]
-            await message.answer(msg, parse_mode='HTML')
+            lines = []
+            lines.append("✅ <b>Готово!</b>")
+            lines.append("")
+            lines.append("Задача выполнена: " + result)
+            lines.append("")
+            lines.append("Осталось задач: " + str(remaining))
+            lines.append(MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)])
+            await message.answer("\n".join(lines), parse_mode='HTML')
         else:
             await message.answer("❌ " + result)
     except ValueError:
@@ -287,10 +261,7 @@ async def cmd_priority(message: Message):
     normal = [t for t in tasks if t.get('Приоритет') == 'normal']
     top5 = (urgent + important + normal)[:5]
     text = format_task_list(top5, "🔥 ТОП-5 ПРИОРИТЕТНЫХ ЗАДАЧ")
-    text += '
-
-<i>Начни с первой — остальное подождёт!</i>'
-    await message.answer(text, parse_mode='HTML')
+    await message.answer(text + "\n\n<i>Начни с первой — остальное подождёт!</i>", parse_mode='HTML')
 
 @dp.message(Command("delete"))
 async def cmd_delete_cmd(message: Message):
@@ -309,16 +280,15 @@ async def process_new_task(message: Message, task_text: str):
     tags = get_tags(task_text)
     success, result = add_task_to_sheet(task_text, message.chat.id, priority, tags)
     if success:
-        msg = '✅ <b>Задача добавлена!</b>
-
-📝 ' + task_text + '
-'
-        msg += priority_label + '
-🏷️ ' + tags + '
-
-'
-        msg += MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)]
-        await message.answer(msg, parse_mode='HTML')
+        lines = []
+        lines.append("✅ <b>Задача добавлена!</b>")
+        lines.append("")
+        lines.append("📝 " + task_text)
+        lines.append(priority_label)
+        lines.append("🏷️ " + tags)
+        lines.append("")
+        lines.append(MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)])
+        await message.answer("\n".join(lines), parse_mode='HTML')
     else:
         await message.answer("❌ Ошибка: " + result)
 
@@ -330,9 +300,7 @@ async def handle_text(message: Message):
     elif text == "🔥 Срочные":
         await cmd_priority(message)
     elif text == "✅ Выполнено":
-        await message.answer("Напиши: /done [номер задачи]
-
-Или посмотри список: /list")
+        await message.answer("Напиши: /done [номер задачи]\n\nИли посмотри список: /list")
     elif text == "➕ Новая задача":
         await message.answer("Просто напиши задачу текстом!")
     elif text == "🗑️ Удалить":
@@ -340,34 +308,26 @@ async def handle_text(message: Message):
     else:
         await process_new_task(message, text)
 
-# Обработка голосовых сообщений
 @dp.message(lambda msg: msg.voice is not None)
 async def handle_voice(message: Message):
     await message.answer("🎤 Распознаю голосовое сообщение...")
-
     try:
         file = await bot.get_file(message.voice.file_id)
         voice_bytes = await bot.download_file(file.file_path)
-
         with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as tmp_ogg:
             tmp_ogg.write(voice_bytes.read())
             ogg_path = tmp_ogg.name
-
         wav_path = ogg_path.replace('.ogg', '.wav')
         audio = AudioSegment.from_ogg(ogg_path)
         audio.export(wav_path, format="wav")
-
         recognizer = sr.Recognizer()
         with sr.AudioFile(wav_path) as source:
             audio_data = recognizer.record(source)
             text = recognizer.recognize_google(audio_data, language='ru-RU')
-
         os.unlink(ogg_path)
         os.unlink(wav_path)
-
         await message.answer("📝 <b>Распознал:</b> " + text, parse_mode='HTML')
         await process_new_task(message, text)
-
     except sr.UnknownValueError:
         await message.answer("❌ Не удалось распознать речь. Попробуй ещё раз или напиши текстом.")
     except sr.RequestError as e:
@@ -376,7 +336,6 @@ async def handle_voice(message: Message):
         logger.error(f"Ошибка обработки голосового: {e}")
         await message.answer("❌ Ошибка обработки голосового. Напиши текстом, пожалуйста.")
 
-# === FLASK ROUTES ===
 @app.route('/')
 def health_check():
     return {'status': 'ok', 'bot': 'GTS Task Bot', 'time': datetime.now().isoformat()}
