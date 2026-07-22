@@ -347,18 +347,14 @@ async def setup_webhook():
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Используем существующий loop или создаём новый
         try:
-            loop.run_until_complete(dp.feed_update(bot, update))
-        finally:
-            loop.close()
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        loop.run_until_complete(dp.feed_update(bot, update))
         return 'ok', 200
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return 'error', 500
-
-if __name__ == '__main__':
-    # Не вызываем setup_webhook здесь — он уже установлен через Telegram API
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
