@@ -191,12 +191,11 @@ def get_tags(text):
 def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
     if not tasks:
         return "📭 Список задач пуст. Добавь первую: просто напиши текст!"
-
-    # Используем одинарные кавычки внутри строки, чтобы избежать конфликта
-    header = '<b>' + title + ':</b>'
-    text = header + '\n\n'
-
-'
+    
+    lines = []
+    lines.append("<b>" + title + ":</b>")
+    lines.append("")
+    
     for i, task in enumerate(tasks, 1):
         priority = task.get('Приоритет', 'normal')
         emoji = '🔥' if priority == 'urgent' else '⚡' if priority == 'important' else '📅'
@@ -205,14 +204,14 @@ def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
         task_text = task.get('Задача', '')
         if len(task_text) > 100:
             task_text = task_text[:97] + "..."
-        text += emoji + ' <b>#' + str(i) + '</b> ' + task_text + '
-'
-        text += '   ' + tags + ' | ' + date + '
-
-'
-    text += '
-<i>Всего активных: ' + str(len(tasks)) + '</i>'
-    return text
+        lines.append(emoji + ' <b>#' + str(i) + '</b> ' + task_text)
+        lines.append('   ' + tags + ' | ' + date)
+        lines.append("")
+    
+    lines.append("")
+    lines.append("<i>Всего активных: " + str(len(tasks)) + "</i>")
+    
+    return "\n".join(lines)
 
 # === KEYBOARD ===
 main_kb = ReplyKeyboardMarkup(
