@@ -337,19 +337,28 @@ async def handle_voice(message: Message):
         logger.error(f"Ошибка обработки голосового: {e}")
         await message.answer("❌ Ошибка обработки голосового. Напиши текстом, пожалуйста.")
 
+async def setup_webhook():
+    if WEBHOOK_URL:
+        webhook_path = WEBHOOK_URL + '/' + BOT_TOKEN
+        await bot.set_webhook(webhook_path)
+        logger.info(f"Webhook установлен: {webhook_path}")
+
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(dp.feed_update(bot, update))
-        loop.close()
+        try:
+            loop.run_until_complete(dp.feed_update(bot, update))
+        finally:
+            loop.close()
         return 'ok', 200
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return 'error', 500
 
 if __name__ == '__main__':
+    # Не вызываем setup_webhook здесь — он уже установлен через Telegram API
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
