@@ -194,7 +194,7 @@ def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
 
     # Используем одинарные кавычки внутри строки, чтобы избежать конфликта
     header = '<b>' + title + ':</b>'
-    text = header + '
+    text = header + '\n\n'
 
 '
     for i, task in enumerate(tasks, 1):
