@@ -309,46 +309,48 @@ async def handle_text(message: Message):
     else:
         await process_new_task(message, text)
 
-@dp.message(lambda msg: msg.voice is not None)
-async def handle_voice(message: Message):
-    await message.answer("🎤 Распознаю голосовое сообщение...")
-    try:
-        file = await bot.get_file(message.voice.file_id)
-        voice_bytes = await bot.download_file(file.file_path)
-        with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as tmp_ogg:
-            tmp_ogg.write(voice_bytes.read())
-            ogg_path = tmp_ogg.name
-        wav_path = ogg_path.replace('.ogg', '.wav')
-        audio = AudioSegment.from_ogg(ogg_path)
-        audio.export(wav_path, format="wav")
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(wav_path) as source:
-            audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data, language='ru-RU')
-        os.unlink(ogg_path)
-        os.unlink(wav_path)
-        await message.answer("📝 <b>Распознал:</b> " + text, parse_mode='HTML')
+@dp.message(lambda msg: msg.text and not msg.text.startswith('/'))
+async def handle_text(message: Message):
+    text = message.text
+    if text == "📋 Мои задачи":
+        await cmd_list(message)
+    elif text == "🔥 Срочные":
+        await cmd_priority(message)
+    elif text == "✅ Выполнено":
+        await message.answer("Напиши: /done [номер задачи]\n\nИли посмотри список: /list")
+    elif text == "➕ Новая задача":
+        await message.answer("Просто напиши задачу текстом!")
+    elif text == "🗑️ Удалить":
+        await message.answer("Напиши: /delete [номер задачи]")
+    else:
         await process_new_task(message, text)
-    except sr.UnknownValueError:
-        await message.answer("❌ Не удалось распознать речь. Попробуй ещё раз или напиши текстом.")
-    except sr.RequestError as e:
-        await message.answer("❌ Ошибка сервиса распознавания: " + str(e))
-    except Exception as e:
-        logger.error(f"Ошибка обработки голосового: {e}")
-        await message.answer("❌ Ошибка обработки голосового. Напиши текстом, пожалуйста.")
 
-async def setup_webhook():
-    if WEBHOOK_URL:
-        webhook_path = WEBHOOK_URL + '/' + BOT_TOKEN
-        await bot.set_webhook(webhook_path)
-        logger.info(f"Webhook установлен: {webhook_path}")
+@app.route('/')
+def health_check():
+    return {'status': 'ok', 'bot': 'GTS Task Bot', 'time': datetime.now().isoformat()}
+
+# Глобальный loop для aiogram
+aiogram_loop = asyncio.new_event_loop()
+
+def start_background_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+# Запускаем background loop в отдельном потоке
+threading.Thread(target=start_background_loop, args=(aiogram_loop,), daemon=True).start()
 
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
-        asyncio.run(dp.feed_update(bot, update))
+        # Используем глобальный loop через run_coroutine_threadsafe
+        future = asyncio.run_coroutine_threadsafe(dp.feed_update(bot, update), aiogram_loop)
+        future.result(timeout=10)  # Ждём результат 10 секунд
         return 'ok', 200
     except Exception as e:
         logger.error("Webhook error: " + str(e))
         return 'error', 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
