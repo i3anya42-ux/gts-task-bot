@@ -337,15 +337,15 @@ async def handle_voice(message: Message):
         logger.error(f"Ошибка обработки голосового: {e}")
         await message.answer("❌ Ошибка обработки голосового. Напиши текстом, пожалуйста.")
 
-@app.route('/')
-def health_check():
-    return {'status': 'ok', 'bot': 'GTS Task Bot', 'time': datetime.now().isoformat()}
-
 @app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
-        asyncio.run(dp.feed_update(bot, update))
+        # Создаём новый event loop для каждого запроса
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(dp.feed_update(bot, update))
+        loop.close()
         return 'ok', 200
     except Exception as e:
         logger.error(f"Webhook error: {e}")
