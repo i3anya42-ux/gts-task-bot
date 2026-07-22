@@ -347,13 +347,8 @@ async def setup_webhook():
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        loop.run_until_complete(dp.feed_update(bot, update))
+        asyncio.run(dp.feed_update(bot, update))
         return 'ok', 200
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.error("Webhook error: " + str(e))
         return 'error', 500
