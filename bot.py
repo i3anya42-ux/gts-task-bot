@@ -17,7 +17,7 @@ import requests
 # === НАСТРОЙКИ ===
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8656704437:AAEZxBboXqIGWUPbdLPc8t9a2jo4tqTVSdE")
 OWNER_CHAT_ID = os.environ.get("OWNER_CHAT_ID")
-WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_URL", "")  # Render даёт автоматически
+WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
 
 # Google Sheets
 SCOPE = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
@@ -58,13 +58,11 @@ IMPORTANT_KEYWORDS = ['клиент', 'заявка', 'счёт', 'счет', '�
 # === GOOGLE SHEETS ===
 def get_gsheet_client():
     try:
-        # Render: credentials из переменной окружения
         creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
         if creds_json:
             creds_info = json.loads(creds_json)
             creds = Credentials.from_service_account_info(creds_info, scopes=SCOPE)
         else:
-            # Локально: из файла
             creds_path = os.path.join(os.path.dirname(__file__), 'credentials.json')
             if os.path.exists(creds_path):
                 creds = Credentials.from_service_account_file(creds_path, scopes=SCOPE)
@@ -194,9 +192,11 @@ def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
     if not tasks:
         return "📭 Список задач пуст. Добавь первую: просто напиши текст!"
 
-    text = f"<b>{title}:</b>
+    # Используем одинарные кавычки внутри строки, чтобы избежать конфликта
+    header = '<b>' + title + ':</b>'
+    text = header + '
 
-"
+'
     for i, task in enumerate(tasks, 1):
         priority = task.get('Приоритет', 'normal')
         emoji = '🔥' if priority == 'urgent' else '⚡' if priority == 'important' else '📅'
@@ -205,13 +205,13 @@ def format_task_list(tasks, title="📋 ТВОИ ЗАДАЧИ"):
         task_text = task.get('Задача', '')
         if len(task_text) > 100:
             task_text = task_text[:97] + "..."
-        text += f"{emoji} <b>#{i}</b> {task_text}
-"
-        text += f"   {tags} | {date}
+        text += emoji + ' <b>#' + str(i) + '</b> ' + task_text + '
+'
+        text += '   ' + tags + ' | ' + date + '
 
-"
-    text += f"
-<i>Всего активных: {len(tasks)}</i>"
+'
+    text += '
+<i>Всего активных: ' + str(len(tasks)) + '</i>'
     return text
 
 # === KEYBOARD ===
@@ -227,7 +227,7 @@ main_kb = ReplyKeyboardMarkup(
 # === HANDLERS ===
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    welcome = f"""👋 <b>Привет!</b> Я твой личный помощник по задачам.
+    welcome = """👋 <b>Привет!</b> Я твой личный помощник по задачам.
 
 <b>Как пользоваться:</b>
 • Просто напиши задачу — я добавлю в список
@@ -240,7 +240,7 @@ async def cmd_start(message: Message):
 /priority — топ-5 срочных
 /delete [номер] — удалить
 
-{MOTIVATIONS[0]}"""
+""" + MOTIVATIONS[0]
     await message.answer(welcome, reply_markup=main_kb, parse_mode='HTML')
 
 @dp.message(Command("add"))
@@ -263,18 +263,17 @@ async def cmd_done(message: Message):
         success, result = mark_task_done(num, chat_id=message.chat.id)
         if success:
             remaining = len(get_all_tasks(chat_id=message.chat.id))
-            await message.answer(
-                f"✅ <b>Готово!</b>
+            msg = '✅ <b>Готово!</b>
 
-Задача выполнена: {result}
+Задача выполнена: ' + result + '
 
-"
-                f"Осталось задач: {remaining}
-{MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)]}",
-                parse_mode='HTML'
-            )
+'
+            msg += 'Осталось задач: ' + str(remaining) + '
+'
+            msg += MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)]
+            await message.answer(msg, parse_mode='HTML')
         else:
-            await message.answer(f"❌ {result}")
+            await message.answer("❌ " + result)
     except ValueError:
         await message.answer("❌ Укажи номер задачи. Например: /done 3")
 
@@ -289,9 +288,9 @@ async def cmd_priority(message: Message):
     normal = [t for t in tasks if t.get('Приоритет') == 'normal']
     top5 = (urgent + important + normal)[:5]
     text = format_task_list(top5, "🔥 ТОП-5 ПРИОРИТЕТНЫХ ЗАДАЧ")
-    text += "
+    text += '
 
-<i>Начни с первой — остальное подождёт!</i>"
+<i>Начни с первой — остальное подождёт!</i>'
     await message.answer(text, parse_mode='HTML')
 
 @dp.message(Command("delete"))
@@ -300,9 +299,9 @@ async def cmd_delete_cmd(message: Message):
         num = int(message.text.replace('/delete', '').strip()) - 1
         success, result = delete_task(num, chat_id=message.chat.id)
         if success:
-            await message.answer(f"🗑️ Задача удалена: {result}")
+            await message.answer("🗑️ Задача удалена: " + result)
         else:
-            await message.answer(f"❌ {result}")
+            await message.answer("❌ " + result)
     except ValueError:
         await message.answer("❌ Укажи номер. Например: /delete 3")
 
@@ -311,19 +310,18 @@ async def process_new_task(message: Message, task_text: str):
     tags = get_tags(task_text)
     success, result = add_task_to_sheet(task_text, message.chat.id, priority, tags)
     if success:
-        await message.answer(
-            f"✅ <b>Задача добавлена!</b>
+        msg = '✅ <b>Задача добавлена!</b>
 
-📝 {task_text}
-{priority_label}
-🏷️ {tags}
+📝 ' + task_text + '
+'
+        msg += priority_label + '
+🏷️ ' + tags + '
 
-"
-            f"{MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)]}",
-            parse_mode='HTML'
-        )
+'
+        msg += MOTIVATIONS[datetime.now().second % len(MOTIVATIONS)]
+        await message.answer(msg, parse_mode='HTML')
     else:
-        await message.answer(f"❌ Ошибка: {result}")
+        await message.answer("❌ Ошибка: " + result)
 
 @dp.message(lambda msg: msg.text and not msg.text.startswith('/'))
 async def handle_text(message: Message):
@@ -343,12 +341,48 @@ async def handle_text(message: Message):
     else:
         await process_new_task(message, text)
 
+# Обработка голосовых сообщений
+@dp.message(lambda msg: msg.voice is not None)
+async def handle_voice(message: Message):
+    await message.answer("🎤 Распознаю голосовое сообщение...")
+
+    try:
+        file = await bot.get_file(message.voice.file_id)
+        voice_bytes = await bot.download_file(file.file_path)
+
+        with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as tmp_ogg:
+            tmp_ogg.write(voice_bytes.read())
+            ogg_path = tmp_ogg.name
+
+        wav_path = ogg_path.replace('.ogg', '.wav')
+        audio = AudioSegment.from_ogg(ogg_path)
+        audio.export(wav_path, format="wav")
+
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            audio_data = recognizer.record(source)
+            text = recognizer.recognize_google(audio_data, language='ru-RU')
+
+        os.unlink(ogg_path)
+        os.unlink(wav_path)
+
+        await message.answer("📝 <b>Распознал:</b> " + text, parse_mode='HTML')
+        await process_new_task(message, text)
+
+    except sr.UnknownValueError:
+        await message.answer("❌ Не удалось распознать речь. Попробуй ещё раз или напиши текстом.")
+    except sr.RequestError as e:
+        await message.answer("❌ Ошибка сервиса распознавания: " + str(e))
+    except Exception as e:
+        logger.error(f"Ошибка обработки голосового: {e}")
+        await message.answer("❌ Ошибка обработки голосового. Напиши текстом, пожалуйста.")
+
 # === FLASK ROUTES ===
 @app.route('/')
 def health_check():
     return {'status': 'ok', 'bot': 'GTS Task Bot', 'time': datetime.now().isoformat()}
 
-@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+@app.route('/' + BOT_TOKEN, methods=['POST'])
 def webhook():
     try:
         update = Update.model_validate(request.get_json())
@@ -360,13 +394,11 @@ def webhook():
 
 async def setup_webhook():
     if WEBHOOK_URL:
-        webhook_path = f"{WEBHOOK_URL}/{BOT_TOKEN}"
+        webhook_path = WEBHOOK_URL + '/' + BOT_TOKEN
         await bot.set_webhook(webhook_path)
         logger.info(f"Webhook установлен: {webhook_path}")
 
 if __name__ == '__main__':
-    # Устанавливаем webhook
     asyncio.run(setup_webhook())
-    # Запускаем Flask
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
